@@ -1,7 +1,7 @@
 # Telegram AliExpress Affiliate Relay
 
 Turn any Telegram channel with product links into a monetized feed in minutes.  
-This script **listens to a source channel**, **detects the first URL in each new message**, **converts it to an AliExpress affiliate link**, and **reposts the updated message** to a target channel automatically.
+This script **listens to one or many source channels**, **detects the first URL in each new message**, **converts it to an AliExpress affiliate link**, and **reposts the updated message** to a target channel automatically.
 
 <p align="left">
   <a href="https://www.python.org/"><img alt="Python" src="https://img.shields.io/badge/Python-3.9%2B-blue.svg"></a>
@@ -19,7 +19,7 @@ This script **listens to a source channel**, **detects the first URL in each new
 ---
 
 ## What it does
-- Watches a **source channel** (`SOURCE_CHANNEL_ID`) for new messages.
+- Watches **one or many source channels** (`SOURCE_CHANNEL_IDS`) for new messages.
 - Parses the **first URL** in the message body (regex `https?://\S+`).
 - Converts that URL into an **AliExpress affiliate link** using `AliexpressApi` (`KEY`, `SECRET`, `TRACKING_ID` required).
 - **Replaces** the original URL with the affiliate one and **forwards** the message to the **target channel** (`TARGET_CHANNEL_ID`).
@@ -31,7 +31,7 @@ This script **listens to a source channel**, **detects the first URL in each new
 
 ## How it works (under the hood)
 1. `Telethon` starts a **user session** via `PHONE_NUMBER` (creates `anon.session` on first run).
-2. `@client.on(events.NewMessage(chats=SOURCE_CHANNEL_ID))` fires on each new message.
+2. `@client.on(events.NewMessage(chats=SOURCE_CHANNEL_IDS))` fires on each new message from any configured source channel.
 3. `find_link_in_message()` extracts the **first** URL.
 4. `generate_affiliate_link()` calls `aliexpress.get_affiliate_links(original_link)` and picks `promotion_link`.
 5. The message text is updated and sent to `TARGET_CHANNEL_ID`.
@@ -85,20 +85,30 @@ API_HASH=your_api_hash
 PHONE_NUMBER=+380XXXXXXXXX
 
 # Channel IDs (integer IDs; for supergroups/channels use -100XXXXXXXXXX)
-SOURCE_CHANNEL_ID=-1001111111111
+# Unlimited sources: separate with commas, spaces, semicolons, or new lines
+SOURCE_CHANNEL_IDS=-1001111111111,-1002222222222,-1003333333333
 TARGET_CHANNEL_ID=-1002222222222
+
+# Optional retry tuning
+API_RETRY_ATTEMPTS=3
+API_RETRY_DELAY_SECONDS=2
+TELEGRAM_RETRY_ATTEMPTS=3
+TELEGRAM_RETRY_DELAY_SECONDS=3
+RECONNECT_DELAY_SECONDS=5
 ```
 
 **Notes**
 - Get `API_ID`/`API_HASH` at https://my.telegram.org.
 - Use **numeric IDs** for private channels. You can fetch them via info bots or a small Telethon helper.
+- Backward compatibility is preserved: `SOURCE_CHANNEL_ID` still works for a single channel, but `SOURCE_CHANNEL_IDS` is recommended.
+- Retry values are optional and control automatic retries for AliExpress API failures and Telegram reconnect/send failures.
 
 ---
 
 ## Run
 
 ```bash
-python main.py
+python ali_affiliate_forward.py
 ```
 On the first launch, Telethon will ask for a one‑time code in Telegram to create the local session (`anon.session`). After that, the script runs continuously and relays messages as they arrive.
 
@@ -106,9 +116,12 @@ On the first launch, Telethon will ask for a one‑time code in Telegram to crea
 
 ## Features & limitations
 
-- Replaces **only the first** URL per message (extendable to many).
+- Replaces **only the first** URL per message.
 - Designed for **AliExpress** links; non‑AliExpress URLs may be ignored by the SDK.
 - Uses a **user session** (not a bot). Ensure the account can **read** from the source and **post** to the target channel.
+- Preserves media posts by resending the media with an updated caption when a link exists in the caption.
+- Retries AliExpress link generation automatically with incremental delays.
+- Retries Telegram sending and reconnects automatically after disconnects.
 - Verbose logging explains why a URL wasn’t replaced or a message wasn’t sent.
 
 ---
@@ -117,8 +130,9 @@ On the first launch, Telethon will ask for a one‑time code in Telegram to crea
 
 - **ModuleNotFoundError: `aliexpress_api`** → install `aliexpress-api` or try `aliexpress-affiliate-api` depending on the fork you use.
 - **Auth loop** on first run → make sure the phone number is valid and you enter the Telegram login code promptly.
-- **Wrong channel IDs** → verify you are using **numeric** IDs (often start with `-100` for channels/supergroups).
+- **Wrong channel IDs** → verify you are using **numeric** IDs (often start with `-100` for channels/supergroups), and separate multiple source IDs with commas, spaces, semicolons, or line breaks.
 - **No messages forwarded** → confirm the account has permissions in both channels and that messages actually contain URLs.
+- **Intermittent API or Telegram outages** → tune `API_RETRY_ATTEMPTS`, `TELEGRAM_RETRY_ATTEMPTS`, and `RECONNECT_DELAY_SECONDS` in `.env`.
 
 --- 
 
@@ -143,6 +157,4 @@ I can build for you **custom Telegram bots, scripts, and automation solutions** 
 [![Email – Contact](https://img.shields.io/badge/Email-Contact-EA4335?logo=gmail&logoColor=white)](mailto:lapchuk.freelancer@gmail.com)
 
 </div>
-
-
 
